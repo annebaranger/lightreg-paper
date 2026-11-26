@@ -2,10 +2,10 @@
 
 Code to reproduce the analyses and figures of:
 
-> **[Paper title]** — Baranger A. et al. ([journal], [year]). DOI: [paper DOI]
+> **Fine-scale light distribution shapes temperate forest regeneration composition and structure: insights from terrestrial laser scanning and 3D radiative transfer modelling** — Baranger A. et al. (BioRXiv). DOI: 
 
-Code: this repository (archived on Zenodo, DOI: [code DOI]).
-Data: Zenodo, DOI: [data DOI].
+Code: this repository
+Data: Zenodo, DOI: 10.5281/zenodo.24540768
 
 ## Quick start
 
@@ -71,10 +71,6 @@ outputs are in `data/analysis/`.
 
 ## Software
 
-Analyses were run with R [version]. Main packages: targets, dplyr, tidyr,
+Analyses were run with R [4.5.1]. Main packages: targets, dplyr, tidyr,
 ggplot2, patchwork, vegan, rdacca.hp, lme4 (main pipeline); lidR, terra, sf,
 mgcv (demo). 
-
-## Licence
-
-Code: [MIT]. Data: see the Zenodo record ([CC-BY 4.0]).

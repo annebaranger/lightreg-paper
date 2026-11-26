@@ -1,7 +1,7 @@
 # Data
 
 This folder is not tracked by git. Download the data archive from Zenodo
-([data DOI]) and unzip it here, so that it contains:
+(10.5281/zenodo.24540768) and unzip it here, so that it contains:
 
 ```
 data/

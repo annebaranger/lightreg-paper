@@ -5,7 +5,8 @@ Code to reproduce the analyses and figures of:
 > **Fine-scale light distribution shapes temperate forest regeneration composition and structure: insights from terrestrial laser scanning and 3D radiative transfer modelling** — Baranger A. et al. (BioRXiv). DOI: 
 
 Code: this repository
-Data: Zenodo, DOI: 10.5281/zenodo.24540768
+
+Data: 10.5281/zenodo.24540768
 
 ## Quick start
 

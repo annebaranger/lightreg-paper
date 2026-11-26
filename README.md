@@ -73,7 +73,7 @@ outputs are in `data/analysis/`.
 
 Analyses were run with R [version]. Main packages: targets, dplyr, tidyr,
 ggplot2, patchwork, vegan, rdacca.hp, lme4 (main pipeline); lidR, terra, sf,
-mgcv (demo). [Exact versions: renv.lock.]
+mgcv (demo). 
 
 ## Licence
 

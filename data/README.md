@@ -7,7 +7,7 @@ This folder is not tracked by git. Download the data archive from Zenodo
 data/
 ├── analysis/                    # derived tables, read by _targets.R
 │   ├── metric3d_all.csv           # TLS / light metrics per 1 m height slice (0.5-4.5 m)
-│   ├── metric3d_all_unsliced.csv  # same metrics on the whole 0-4 m layer
+│   ├── metric3d_all_unsliced.csv  # same metrics on the whole 0-4.5 m layer
 │   ├── H_ext_all.csv              # light extinction profile and PAD metrics
 │   ├── gini_all.csv               # light heterogeneity (Gini) and big-leaf deviation
 │   ├── regen_metrics_plot.csv     # regeneration metrics, plot level
@@ -26,4 +26,3 @@ data/
         └── settings/              # DART simulation settings (xml), one folder per hour
 ```
 
-The Zenodo archive has its own `README_data.md` describing every column.

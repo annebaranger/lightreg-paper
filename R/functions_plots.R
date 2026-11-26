@@ -1,0 +1,532 @@
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#
+#### SCRIPT INTRODUCTION ####
+#
+#' @name functions_figures.R  
+#' @description R script containing helpers functions
+#' @author Anne Baranger
+#
+#
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+# --- Fig 1: regeneration PCA with side boxplots --------------------------------
+plot_pca_regen <- function(res, scale_f = 5, kw_x = 2.7, kw_y = 2.5, mid_level = "Medium") {
+  pts     <- filter(res$scores, subplot == "plot")
+  pts_cat <- filter(pts, !is.na(reg_category))
+  vc      <- res$var_coord
+  ax      <- pca_axes(pts, vc, scale_f)
+  kw1 <- filter(res$kw, axis == "PC1") %>% mutate(x = kw_x, y = mid_level)
+  kw2 <- filter(res$kw, axis == "PC2") %>% mutate(x = mid_level, y = kw_y)
+  # arrow labels: bold for lidar-derived variables (thick arrows); extra blank
+  # anchors along the arrows keep repelled labels from sitting on the lines;
+  # the two richness labels are nudged apart as their arrow tips almost coincide
+  arrow_labs <- arrow_label_df(vc, scale_f) %>%
+    bind_rows(vc %>%
+                tidyr::crossing(t = seq(0.05, 1, length.out = 30)) %>%
+                transmute(x = PC1 * scale_f * t, y = PC2 * scale_f * t, abrv = "", type)) %>%
+    mutate(face = if_else(abrv %in% vc$abrv[vc$Source == "Lidar-derived"], "bold", "plain"),
+           nudge_y = case_when(abrv == "Richn. sap." ~ -0.7,
+                               abrv == "Richn. tot." ~ 0.3,
+                               TRUE ~ 0))
+
+  ggplot() +
+    geom_vline(xintercept = 0, colour = "darkgrey", linewidth = 0.2) +
+    geom_hline(yintercept = 0, colour = "darkgrey", linewidth = 0.2) +
+    geom_point(data = pts, aes(PC1, PC2, color = reg_category), size = 1, shape = 19) +
+    ggside::geom_xsideboxplot(
+      data = pts_cat, aes(x = PC1, y = reg_category, fill = reg_category),
+      whisker.linewidth = 0.2, median.linewidth = 0.2, box.linewidth = 0.2,
+      orientation = "y", outliers = FALSE) +
+    ggside::geom_ysideboxplot(
+      data = pts_cat, aes(y = PC2, x = reg_category, fill = reg_category),
+      whisker.linewidth = 0.2, median.linewidth = 0.2, box.linewidth = 0.2,
+      orientation = "x", outliers = FALSE) +
+    ggside::geom_xsidetext(data = kw1, aes(x = x, y = y, label = label),
+                           size = 7.5, size.unit = "pt", vjust = -0.02, inherit.aes = FALSE) +
+    ggside::geom_ysidetext(data = kw2, aes(x = x, y = y, label = label),
+                           size = 7.5, size.unit = "pt", inherit.aes = FALSE) +
+    scale_fill_brewer(name = "Regeneration cover", palette = "YlGn", na.value = "grey") +
+    scale_color_brewer(name = "Regeneration cover", palette = "YlGn", na.value = "grey") +
+    guides(color = "none") +
+    ggnewscale::new_scale_color() +
+    geom_segment(data = vc,
+                 aes(x = 0, y = 0, xend = PC1 * scale_f, yend = PC2 * scale_f,
+                     color = type, linewidth = Source),
+                 arrow = arrow(length = unit(0.10, "cm")), lineend = "round") +
+    ggrepel::geom_text_repel(data = arrow_labs,
+                             aes(x = x, y = y, label = abrv, color = type, fontface = face),
+                             nudge_y = arrow_labs$nudge_y,
+                             size = 8 * 0.353, segment.color = "grey50", segment.size = 0.1,
+                             max.overlaps = Inf, seed = 58, show.legend = FALSE) +
+    scale_color_brewer(name = "Variable type", palette = "Dark2") +
+    scale_linewidth_manual(name = "Data source",
+                           values = c("Lidar-derived" = 0.6, "Survey-derived" = 0.2)) +
+    theme_pca_paper() +
+    theme(ggside.panel.scale = 0.15,
+          ggside.panel.grid = element_blank(),
+          ggside.panel.border = element_blank(),
+          ggside.panel.background = element_blank(),
+          ggside.axis.text = element_blank(),
+          ggside.axis.ticks = element_blank()) +
+    labs(x = pca_axis_lab(res$pca, 1), y = pca_axis_lab(res$pca, 2)) +
+    scale_x_continuous(limits = ax$limits, breaks = ax$breaks) +
+    scale_y_continuous(limits = ax$limits, breaks = ax$breaks)
+}
+
+
+
+# --- Light PCA biplot (plot or subplot) ----------------------------------------
+plot_pca_light <- function(res, scale_f = 5, point_size = 0.8) {
+  ax <- pca_axes(res$scores, res$var_coord, scale_f)
+  ggplot() +
+    geom_point(data = res$scores, aes(PC1, PC2, color = reg_category), size = point_size) +
+    scale_color_brewer(name = "Regeneration cover", palette = "YlGn", na.value = "grey") +
+    ggnewscale::new_scale_color() +
+    geom_segment(data = res$var_coord,
+                 aes(x = 0, y = 0, xend = PC1 * scale_f, yend = PC2 * scale_f, color = type),
+                 arrow = arrow(length = unit(0.10, "cm")), lineend = "round", linewidth = 0.3) +
+    ggrepel::geom_text_repel(data = arrow_label_df(res$var_coord, scale_f),
+                             aes(x = x, y = y, label = abrv, color = type),
+                             size=9 * 0.353, show.legend = FALSE) +
+    scale_color_brewer(name = "Variable type", palette = "Dark2") +
+    # guides(color = "none") +
+    theme_pca_paper() +
+    labs(x = pca_axis_lab(res$pca, 1), y = pca_axis_lab(res$pca, 2)) +
+    scale_x_continuous(limits = ax$limits, breaks = ax$breaks) +
+    scale_y_continuous(limits = ax$limits, breaks = ax$breaks)
+}
+
+# --- Light descriptors by regeneration class -----------------------------------
+plot_light_boxes <- function(box_df, kw = NULL, cld = NULL) {
+  p <- ggplot(box_df, aes(label, value, fill = reg_category)) +
+    geom_boxplot(position = position_dodge(width = 0.8, preserve = "single"),
+                 whisker.linewidth = 0.2, median.linewidth = 0.2, box.linewidth = 0.2,
+                 width = 0.5, outlier.shape = NA) +
+    geom_point(aes(color = reg_category),
+               position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8, seed = 1),
+               size = 1, alpha = 0.8, shape = 16, show.legend = FALSE)
+  if (!is.null(kw))
+    p <- p + geom_text(data = kw, aes(x = label, y = 2.5, label = stars),
+                       inherit.aes = FALSE, size = 3, vjust = 0)
+  if (!is.null(cld))
+    p <- p + geom_text(data = cld,
+                       aes(x = label, y = y + 0.25, label = letter, group = reg_category),
+                       position = position_dodge(width = 0.8),
+                       inherit.aes = FALSE, size = 3, vjust = 0)
+  p +
+    scale_fill_brewer(name = "Regeneration cover", palette = "YlGn", na.value = "grey") +
+    scale_color_brewer(name = "Regeneration cover", palette = "YlGn", na.value = "grey") +
+    facet_grid(~type, scales = "free_x") +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.12))) +
+    labs(y = "Scaled values", x = "") +
+    theme_pca_paper() +
+    theme(legend.position = "none",
+          base_size = 9)
+}
+
+plot_light_panel <- function(pca_plot, box_plot) {
+  cowplot::plot_grid(pca_plot + theme(legend.position = "left"), box_plot,
+                     ncol = 2, align = "h", axis = "tb", rel_widths = c(1, 1.5))
+}
+
+# --- Bootstrapped effect plot (light or adults, plot or subplot) ----------------
+plot_effects <- function(stats, var_meta, responses, predictors, drop = NULL,
+                         type_levels = c("Composition", "Quantity", "Complexity"),
+                         lw = c(0.35, 0.65)) {
+  predictors <- setdiff(predictors, drop)
+  lab <- dplyr::select(var_meta, variable, label, type)
+  ord <- unique(c(lab$label[match(predictors, lab$variable)],
+                  lab$label[match(responses,  lab$variable)]))
+  
+  stats %>%
+    filter(explaining %in% predictors) %>%
+    mutate(p_class = cut(p_boot, breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                         labels = names(p_class_colours),
+                         right = FALSE, include.lowest = TRUE)) %>%
+    left_join(rename(lab, explained = variable, label_explained = label,
+                     type_explained = type), by = "explained") %>%
+    left_join(dplyr::select(lab, explaining = variable, label_explaining = label),
+              by = "explaining") %>%
+    mutate(type_explained   = factor(type_explained, levels = type_levels),
+           label_explained  = factor(label_explained, levels = rev(ord)),
+           label_explaining = factor(label_explaining, levels = ord)) %>%
+    ggplot(aes(x = med, y = label_explained)) +
+    geom_vline(xintercept = 0, linetype = 2, linewidth = .2, colour = "grey70") +
+    geom_linerange(aes(xmin = lo,  xmax = hi,  colour = p_class), linewidth = lw[1]) +
+    geom_linerange(aes(xmin = lo5, xmax = hi5, colour = p_class), linewidth = lw[2]) +
+    geom_point(aes(colour = p_class), size = 1.3) +
+    scale_colour_manual(values = p_class_colours, drop = FALSE, name = "p (bootstrap)") +
+    facet_grid(type_explained ~ label_explaining, scales = "free_y", space = "free_y",switch = "y") +
+    labs(x = "Standardized coefficient", y = NULL) +
+    theme_minimal() +
+    theme(base_size = 9,
+          panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5),
+          panel.grid = element_line(linewidth = 0.2),
+          panel.grid.minor = element_blank(),
+          strip.text.y = element_text(angle = 0),
+          strip.text=element_text(face="bold"),
+          strip.placement   = "outside",                  # strips go outside the y-axis labels
+          strip.text.y.left = element_text(angle = 90),
+          legend.position = "bottom",
+          text = element_text(size=9))
+}
+
+# --- Temporal vs spatial variability -------------------------------------------
+plot_variability <- function(res, var_meta,
+                             levels = c("Mean extinction \n at 4.5m", "Gini index",
+                                        "Light profile slope \nat 4.5m")) {
+  res %>%
+    left_join(var_meta, by = c("metric" = "variable")) %>%
+    mutate(label = factor(label, levels = levels)) %>%
+    ggplot(aes(x = spatial_within, y = temporal_within)) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey60") +
+    geom_point(size = 2.5) +
+    facet_wrap(~ label) +
+    expand_limits(x = 0, y = 0) +
+    labs(x = "Spatial variability (between subplots)",
+         y = "Temporal variability (between simulation times)") +
+    theme_bw(base_size = 11) +
+    theme(panel.grid.minor = element_blank(), strip.background = element_blank())
+}
+
+# --- Variance partitioning figures ---------------------------------------------
+vp_group_colours    <- c("Light" = "#E0A526", "Adults" = "#2F6B4F")
+vp_fraction_colours <- c("Light (unique)" = "#E0A526", "Shared" = "#A7A77A",
+                         "Adults (unique)" = "#2F6B4F")
+
+plot_varpart_venn <- function(vp) {
+  multi <- vp$multi
+  fmt   <- function(v) ifelse(v < 0, sprintf("%.2f (≈ 0)", v), sprintf("%.2f", v))
+  circle <- function(x0, g) {
+    t <- seq(0, 2 * pi, length.out = 200)
+    data.frame(x = x0 + cos(t), y = sin(t), group = g)
+  }
+  ci_txt <- function(t) with(vp$multi_jack[vp$multi_jack$term == t, ],
+                             sprintf("[%.2f; %.2f]", ci_low, ci_high))
+  labs_df <- data.frame(
+    x = c(-1.05, 0, 1.05), y = 0,
+    text = paste0(
+      c(sprintf("[a]\n%s %s", fmt(multi$light_unique), p_stars(multi$p_light_unique, "n.s.")),
+        sprintf("[b]\n%s",    fmt(multi$shared)),
+        sprintf("[c]\n%s %s", fmt(multi$adult_unique), p_stars(multi$p_adult_unique, "n.s."))),
+      "\n", c(ci_txt("light_unique"), ci_txt("shared"), ci_txt("adult_unique"))))
+  
+  ggplot() +
+    geom_polygon(data = rbind(circle(-0.55, "Light"), circle(0.55, "Adults")),
+                 aes(x, y, fill = group, group = group),
+                 alpha = 0.35, colour = "white", linewidth = 1.2) +
+    geom_text(data = labs_df, aes(x, y, label = text), size = 9 * 0.353, fontface = "bold",
+              colour = "grey15", lineheight = 0.9) +
+    geom_text(data = data.frame(x = c(-0.95, 0.95), y = 1.2, group = c("Light", "Adults")),
+              aes(x, y, label = group, colour = group), size = 10 * 0.353, fontface = "bold") +
+    annotate("text", x = 0, y = -1.3, colour = "grey40", size=9 * 0.353,
+             label = sprintf("Residuals = %.2f \nAdjusted R² [jackknife 95 %% CI] \n full model: adj. R² = %.2f, p = %.3f",
+                             multi$residuals,multi$full_adj_r2, multi$p_full)) +
+    scale_fill_manual(values = vp_group_colours) +
+    scale_colour_manual(values = vp_group_colours) +
+    coord_equal(xlim = c(-1.8, 1.8), ylim = c(-1.45, 1.4)) +
+    theme_void() +
+    theme(legend.position = "none",
+          text=element_text(size=9))
+}
+
+plot_varpart_univariate <- function(vp, labels, alpha = 0.1) {
+  uf <- vp$uni_fractions
+  lev <- vp$regen_vars
+  pn  <- function(v) pretty_name(v, labels)
+  
+  d <- bind_rows(
+    data.frame(response = uf$response, fraction = "Light (unique)",
+               value = uf$light_unique, p = uf$p_light_unique),
+    data.frame(response = uf$response, fraction = "Shared", value = uf$shared, p = NA),
+    data.frame(response = uf$response, fraction = "Adults (unique)",
+               value = uf$adult_unique, p = uf$p_adult_unique)) %>%
+    mutate(fraction = factor(fraction, levels = names(vp_fraction_colours)),
+           response = factor(response, levels = lev),
+           y_star   = pmax(value, 0, na.rm = TRUE) + 0.04)
+  top <- uf %>%
+    mutate(response = factor(response, levels = lev),
+           label = sprintf("adj. R² = %.2f %s", full_adj_r2, p_stars(p_full, "n.s.")))
+  y_top <- max(d$y_star) + 0.12
+
+  x_labs <- setNames(
+    paste0(pn(as.character(top$response)), "\n", top$label),
+    as.character(top$response)
+  )
+  
+  fig_a <- ggplot(d, aes(x = response, y = value, fill = fraction)) +
+    geom_hline(yintercept = 0, colour = "grey50") +
+    geom_col(position = position_dodge(width = 0.8), width = 0.75) +
+    geom_text(aes(y = y_star, label = p_stars(p, "n.s."), group = fraction),
+              position = position_dodge(width = 0.8), vjust=1,
+              size = 9 * 0.353, colour = "grey20") +
+    scale_fill_manual(values = vp_fraction_colours, name = NULL) +
+    scale_x_discrete(labels = x_labs) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.08))) +
+    labs(x = NULL, y = "Variance explained (adjusted R²)") +
+    theme_varpart() +
+    theme(panel.grid.major.x = element_blank(),
+          axis.text.x = element_text(lineheight = 1.1))
+  
+  fig_b <- vp$uni_importance %>%
+    mutate(response = factor(response, levels = lev),
+           variable = factor(variable, levels = c(rev(vp$light_vars), rev(vp$adult_vars))),
+           group    = factor(group, levels = c("Adults", "Light")),
+           panel    = "Regeneration",                                   # <- new
+           label    = sprintf("#%d%s", rank,
+                              if_else(p_perm > alpha, "", paste0("\n", p_stars(p_perm, "n.s."))))) %>%
+    ggplot(aes(x = response, y = variable, fill = individual)) +
+    geom_tile(colour = "white", linewidth = 1.2) +
+    geom_text(aes(label = label), size = 9 * 0.353, lineheight = 0.85, colour = "grey10") +
+    facet_grid(group ~ panel, scales = "free_y", space = "free_y", switch = "y") +   # <- ~ panel
+    scale_fill_gradient2(low = "#B2443A", mid = "white", high = "#2B4C7E", midpoint = 0,
+                         name = "Individual \nimportance\n(adjusted R²)") +
+    scale_x_discrete(labels = pn, position = "top") +
+    scale_y_discrete(labels = pn) +
+    labs(x = NULL, y = NULL) +
+    theme_varpart() +
+    theme(panel.grid = element_blank(),
+          text = element_text(size = 8),
+          strip.text.y = element_text(face = "bold", angle = 0, size = 11),
+          strip.text.y.left = element_text(angle = 90),
+          strip.text.x = element_text(face = "bold", size = 11),         # <- match Light/Adults
+          strip.placement = "outside",
+          legend.key.width = unit(0.5, "cm"),
+          legend.key.height = unit(0.25, "cm"))
+  
+  patchwork::wrap_plots(fig_a, fig_b, widths = c(1.3, 1)) +
+    patchwork::plot_annotation(tag_levels = "A")
+}
+
+plot_rda_triplot <- function(vp, labels, regen_colour = "#2B4C7E") {
+  model <- vp$model
+  pn    <- function(v) pretty_name(v, labels)
+  pct   <- round(100 * model$CCA$eig[1:2] / model$tot.chi, 1)
+  pax   <- vp$axis_test$`Pr(>F)`[1:2]
+  sc    <- vegan::scores(model, scaling = 2, choices = 1:2,
+                         display = c("sites", "species", "bp"))
+  ren   <- function(d) { d <- as.data.frame(d); colnames(d)[1:2] <- c("axis1", "axis2"); d$name <- rownames(d); d }
+  sites <- ren(sc$sites); resp <- ren(sc$species); bp <- ren(sc$biplot)
+  bp$group <- ifelse(bp$name %in% vp$adult_vars, "Adults", "Light")
+  spread <- 0.85 * max(abs(sites[, 1:2]))
+  bp[, 1:2]   <- bp[, 1:2]   * spread / max(abs(bp[, 1:2]))
+  resp[, 1:2] <- resp[, 1:2] * spread / max(abs(resp[, 1:2]))
+  
+  regen_lab <- "Regeneration"
+  col_vals  <- c(vp_group_colours, setNames(regen_colour, regen_lab))
+  
+  ggplot() +
+    geom_hline(yintercept = 0, colour = "grey85") +
+    geom_vline(xintercept = 0, colour = "grey85") +
+    geom_point(data = sites, aes(axis1, axis2), colour = "grey60", size = 2, alpha = 0.8) +
+    geom_segment(data = bp, aes(x = 0, y = 0, xend = axis1, yend = axis2, colour = group),
+                 arrow = arrow(length = unit(0.18, "cm")), linewidth = 0.8) +
+    geom_segment(data = resp, aes(x = 0, y = 0, xend = axis1, yend = axis2, colour = regen_lab),
+                 arrow = arrow(length = unit(0.22, "cm")), linewidth = 1.2) +
+    ggrepel::geom_text_repel(data = bp, aes(axis1, axis2, label = pn(name), colour = group),
+                             size = 3.4, show.legend = FALSE, seed = 1) +
+    ggrepel::geom_text_repel(data = resp, aes(axis1, axis2, label = pn(name), colour = regen_lab),
+                             fontface = "bold", size = 3.8, show.legend = FALSE, seed = 1) +
+    scale_colour_manual(values = col_vals, breaks = names(col_vals), name = NULL) +
+    coord_equal() +
+    labs(x = sprintf("RDA axis 1 (%.1f %%, p = %.3f)", pct[1], pax[1]),
+         y = sprintf("RDA axis 2 (%.1f %%, p = %.3f)", pct[2], pax[2])) +
+    theme_varpart()
+}
+
+# --- Fig: light distribution of one plot (3D views, xy sum, vertical profile) --
+
+# Project scene coordinates (m) onto the page, looking down at the (x = 0, y = 0)
+# corner: that corner is the closest, x runs to the right and y to the left.
+iso_project <- function(x, y, z, tilt) {
+  data.frame(u = (x - y) * cos(pi / 6), v = (x + y) * tilt + z)
+}
+
+# One face of a cube as polygons. `val` is the matrix of voxels of the face,
+# averaged by blocks of `step` x `step` cells to keep the figure light; `to_xyz`
+# converts the positions along the matrix rows and columns (m) to scene coordinates.
+iso_face <- function(val, step, vox, to_xyz, tilt) {
+  ra <- ceiling(seq_len(nrow(val)) / step)
+  rb <- ceiling(seq_len(ncol(val)) / step)
+  na <- tabulate(ra)
+  nb <- tabulate(rb)
+  m  <- t(rowsum(t(rowsum(val, ra, na.rm = TRUE)), rb, na.rm = TRUE)) / outer(na, nb)
+  ea <- c(0, cumsum(na)) * vox
+  eb <- c(0, cumsum(nb)) * vox
+  ia <- rep(seq_along(na), times = length(nb))
+  ib <- rep(seq_along(nb), each  = length(na))
+  a  <- c(ea[ia], ea[ia + 1], ea[ia + 1], ea[ia])
+  b  <- c(eb[ib], eb[ib], eb[ib + 1], eb[ib + 1])
+  xyz <- to_xyz(a, b)
+  cbind(iso_project(xyz$x, xyz$y, xyz$z, tilt),
+        cell = rep(seq_along(ia), 4), val = rep(as.vector(m), 4))
+}
+
+# 3D view of an [y, x, z] array, drawn on the common page limits `lim`; `z_thr`
+# optionally marks a height on the two visible sides.
+plot_iso_cube <- function(rb, title, lim, rb_limits, vox, tilt, step, z_thr = NULL,
+                          thr_col = "#0091A8") {
+  nz    <- dim(rb)[3]
+  z_top <- nz * vox
+  x_len <- dim(rb)[2] * vox
+  y_len <- dim(rb)[1] * vox
+  cube  <- bind_rows(
+    iso_face(rb[, 1, ], step, vox, function(a, b) list(x = 0, y = a, z = b), tilt),
+    iso_face(rb[1, , ], step, vox, function(a, b) list(x = a, y = 0, z = b), tilt),
+    iso_face(rb[, , nz], step, vox, function(a, b) list(x = b, y = a, z = z_top), tilt),
+    .id = "face"
+  ) %>%
+    mutate(cell = as.numeric(face) * 1e7 + cell,
+           val  = pmax(val, rb_limits[1]))
+
+  lab_left <- function(z, lab, col) {
+    iso_project(0, y_len, z, tilt) %>% mutate(u = u - 1, lab = lab, col = col)
+  }
+  labs_h <- bind_rows(lab_left(0, "0 m", "grey20"),
+                      lab_left(z_top, sprintf("%.0f m", z_top), "grey20"))
+
+  p <- ggplot() +
+    geom_polygon(data = cube, aes(u, v, group = cell, fill = val, colour = val),
+                 linewidth = 0.05)
+  if (!is.null(z_thr)) {
+    labs_h <- bind_rows(labs_h, lab_left(z_thr, sprintf("%g m", z_thr), thr_col))
+    p <- p +
+      geom_path(data = iso_project(c(0, 0, x_len), c(y_len, 0, 0), z_thr, tilt),
+                aes(u, v), colour = thr_col, linewidth = 0.7)
+  }
+  p +
+    geom_text(data = labs_h, aes(u, v, label = lab), hjust = 1, colour = labs_h$col,
+              size = 7 * 0.353) +
+    scale_fill_viridis_c(option = "inferno", transform = "log10",
+                         breaks = c(100, 300, 1000, 3000), limits = rb_limits,
+                         aesthetics = c("fill", "colour"),
+                         name = "Radiative budget per voxel") +
+    guides(colour = "none", fill = guide_colourbar(title.position = "top")) +
+    coord_fixed(xlim = lim$u, ylim = lim$v, clip = "off", expand = FALSE) +
+    labs(title = title) +
+    theme_void(base_size = 8) +
+    theme(plot.title = element_text(size = 8, face = "bold", margin = margin(b = 4, l = 12)))
+}
+
+#' Light distribution of one plot, from which the light metrics are derived
+#'
+#' A: the voxels of the radiative budget as simulated, on the terrain. B: the same
+#' voxels once height-normalised, with the top of the regeneration layer. C: xy sum
+#' of the voxels of that layer (basis of the Gini index and of the mean radiative
+#' budget). D: vertical extinction profile and its slope at the top of the layer.
+#'
+#' The printed values are those stored in tls_metrics, so they match the analyses.
+#' The map and profile are recomputed the same way as get_light_metrics() and
+#' get_Hext(). rb_mean is computed by get_complexity() over 0-4 m, whereas the map
+#' and the Gini index use 0-4.5 m.
+#'
+#' @param rb_norm path to the height-normalised radiative budget (rb_norm_<plot>)
+#' @param rb_raw path to the radiative budget before normalisation (rb_<plot>)
+#' @param tls_metrics table of light metrics
+#' @param plot_name plot to display
+#' @param time simulation time
+#' @param voxel_size voxel size (m)
+#' @param tilt flattening of the 3D views: lower values show the top face at a more
+#'   grazing angle and shorten the panels
+#' @param cube_step number of voxels averaged along each edge of the cells drawn
+#'   on the cubes (1 = every voxel, for a much heavier figure)
+#' @param rb_floor voxel value below which the log colour scale of the cubes saturates
+#' @param thr_col colour of the regeneration height threshold
+plot_light_3d <- function(rb_norm, rb_raw, tls_metrics, plot_name, time = 12,
+                          voxel_size = 0.25, tilt = 0.35, cube_step = 2, rb_floor = 100,
+                          thr_col = "#0091A8") {
+  stored <- prep_data(tls_metrics, NULL,
+                      c("rb_mean", "gini_h_rb", "slope_ref_agg", "ext_ref_agg",
+                        "z_top", "band_up"),
+                      plot_level = "plot", t = time) %>%
+    filter(plot == plot_name)
+  stopifnot(nrow(stored) == 1)
+
+  # array rows run north to south: reorder them so that the row index grows with y
+  north_up <- function(a) a[rev(seq_len(dim(a)[1])), , , drop = FALSE]
+  rb    <- north_up(loadRData(rb_norm)[[as.character(time)]])
+  raw   <- north_up(loadRData(rb_raw)[[as.character(time)]])
+  z_thr <- stored$band_up
+  k_thr <- round(z_thr / voxel_size)
+  # the layers above the canopy are mostly filled with a constant by normalize_rb()
+  k_top <- min(round(stored$z_top / voxel_size), dim(rb)[3])
+  z_top <- k_top * voxel_size
+
+  # --- A, B: 3D views, on the same scales -----------------------------------------
+  x_len <- dim(rb)[2] * voxel_size
+  y_len <- dim(rb)[1] * voxel_size
+  lim <- list(u = c(-y_len - 1, x_len) * cos(pi / 6),
+              v = c(0, (x_len + y_len) * tilt + dim(raw)[3] * voxel_size))
+  rb_limits <- c(rb_floor, max(raw, rb[, , seq_len(k_top)], na.rm = TRUE))
+
+  p_raw <- plot_iso_cube(raw, "Simulated, on the terrain", lim, rb_limits,
+                         voxel_size, tilt, cube_step)
+  p_norm <- plot_iso_cube(rb[, , seq_len(k_top), drop = FALSE], "Height-normalised",
+                          lim, rb_limits, voxel_size, tilt, cube_step,
+                          z_thr = z_thr, thr_col = thr_col)
+
+  # --- C: xy sum of the voxels of the regeneration layer ------------------------
+  xy_sum <- rowSums(rb[, , seq_len(k_thr), drop = FALSE], dims = 2, na.rm = TRUE)
+  xy_df  <- expand.grid(y = (seq_len(nrow(xy_sum)) - 0.5) * voxel_size,
+                        x = (seq_len(ncol(xy_sum)) - 0.5) * voxel_size) %>%
+    mutate(val = as.vector(xy_sum))
+
+  p_xy <- ggplot(xy_df, aes(x, y, fill = val)) +
+    geom_raster() +
+    scale_fill_viridis_c(option = "inferno", n.breaks = 4, name = "Summed radiative budget") +
+    guides(fill = guide_colourbar(title.position = "top")) +
+    coord_fixed(expand = FALSE) +
+    labs(x = "x (m)", y = "y (m)",
+         title = sprintf("XY sum of voxels, 0–%g m", z_thr),
+         subtitle = sprintf("Gini = %.2f   Mean radiative budget = %.0f",
+                            stored$gini_h_rb, stored$rb_mean)) +
+    theme_pca_paper() +
+    theme(aspect.ratio = NULL,
+          panel.grid = element_blank(),
+          plot.title = element_text(size = 8, face = "bold", margin = margin(b = 4)),
+          plot.subtitle = element_text(size = 8))
+
+  # --- D: vertical profile ------------------------------------------------------
+  rb_prof <- colSums(rb, dims = 2, na.rm = TRUE)
+  prof <- data.frame(z   = seq_along(rb_prof) * voxel_size,
+                     ext = 1 - rb_prof / max(rb_prof, na.rm = TRUE)) %>%
+    filter(z <= z_top)
+  tang <- data.frame(z = c(max(0, z_thr - 6), z_thr + 6)) %>%
+    mutate(ext = stored$ext_ref_agg + stored$slope_ref_agg * (z - z_thr))
+
+  p_prof <- ggplot(prof, aes(ext, z)) +
+    annotate("rect", xmin = -Inf, xmax = Inf, ymin = 0, ymax = z_thr,
+             fill = thr_col, alpha = 0.12) +
+    geom_hline(yintercept = z_thr, colour = thr_col, linewidth = 0.4, linetype = 2) +
+    geom_path(linewidth = 0.5) +
+    geom_line(data = tang, colour = "#C1272D", linewidth = 0.7) +
+    annotate("point", x = stored$ext_ref_agg, y = z_thr, colour = "#C1272D", size = 1.5) +
+    annotate("text", x = 0.02, y = z_thr + 0.7, label = sprintf("%g m", z_thr),
+             colour = thr_col, hjust = 0, vjust = 0, size = 7 * 0.353) +
+    annotate("text", x = 0.02, y = z_thr + 5,
+             label = sprintf("Slope at %g m\n= %.3f m⁻¹", z_thr, stored$slope_ref_agg),
+             colour = "#C1272D", hjust = 0, vjust = 0, size = 8 * 0.353, lineheight = 0.9) +
+    scale_x_continuous(limits = c(0, 1), breaks = c(0, 0.5, 1), expand = expansion(0)) +
+    scale_y_continuous(limits = c(0, z_top), expand = expansion(0)) +
+    labs(x = "Light extinction\n(1 - RB / max RB)", y = "Height (m)",
+         title = "Vertical profile") +
+    theme_pca_paper() +
+    theme(aspect.ratio = 1.5,
+          plot.title = element_text(size = 8, face = "bold", margin = margin(b = 4)))
+
+  cubes <- patchwork::wrap_plots(p_raw, p_norm, guides = "collect")
+  patchwork::wrap_plots(cubes, p_xy, p_prof, widths = c(2.2, 1.1, 0.75)) +
+    patchwork::plot_annotation(tag_levels = "A") &
+    theme(plot.tag = element_text(size = 9, face = "bold"),
+          plot.margin = margin(4, 6, 4, 6),
+          legend.position = "bottom",
+          legend.direction = "horizontal",
+          legend.justification = "center",
+          legend.key.height = unit(0.2, "cm"),
+          legend.key.width = unit(0.7, "cm"),
+          legend.title = element_text(size = 8, margin = margin(b = 3)),
+          legend.text = element_text(size = 7))
+}

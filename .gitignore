@@ -1,0 +1,15 @@
+# data come from the Zenodo archive (see README.md)
+data/*
+!data/README.md
+
+# pipeline stores and outputs
+_targets/
+_targets_demo/
+output/
+figures/
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata

@@ -1,0 +1,6 @@
+main:
+  script: _targets.R
+  store: _targets
+demo:
+  script: _targets_demo.R
+  store: _targets_demo
